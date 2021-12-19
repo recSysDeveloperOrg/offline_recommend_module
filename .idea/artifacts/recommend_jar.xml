@@ -1,0 +1,12 @@
+<component name="ArtifactManager">
+  <artifact type="jar" build-on-make="true" name="recommend:jar">
+    <output-path>$PROJECT_DIR$/out/artifacts/recommend_jar</output-path>
+    <root id="archive" name="recommend.jar">
+      <element id="library" level="project" name="Maven: org.mongodb.spark:mongo-spark-connector_2.12:3.0.1" />
+      <element id="library" level="project" name="Maven: org.mongodb:mongodb-driver-core:4.0.5" />
+      <element id="module-output" name="recommend" />
+      <element id="library" level="project" name="Maven: org.mongodb:mongodb-driver-sync:4.0.5" />
+      <element id="library" level="project" name="Maven: org.mongodb:bson:4.0.5" />
+    </root>
+  </artifact>
+</component>
