@@ -12,20 +12,23 @@ import scala.collection.mutable.ArrayBuffer
  *
  * @author junyu lee
  * */
-object ItemSimilarityMatrixUpdater {
+object ItemSimilarityMatrixUpdater extends Serializable {
   def doUpdate(rdd: RDD[Document]): RDD[Document] = {
     // 先得到用户的喜欢列表
     val userID2Docs = rdd
-      .filter(doc => doc.getDouble("rating") >= 3.0)
+//      .filter(doc => doc.getDouble("rating") >= 3.0)
       .groupBy(doc => doc.getObjectId("user_id"))
     // 然后遍历喜欢列表，得到类似于(电影i_ID,电影j_ID,相似度_w_partial)这样的列表(i<j)
     val partialWeightList = userID2Docs.flatMap(e => {
       val docs = e._2.toArray.sortBy(doc => doc.getObjectId("movie_id"))
       val list = ArrayBuffer[(ObjectId, ObjectId, Double)]()
-      for (i <- 0 to docs.length - 2) {
-        for (j <- i + 1 until docs.length) {
-          list +=
-            ((docs(i).getObjectId("movie_id"), docs(j).getObjectId("movie_id"), 1.0/math.log(1+docs.length)))
+      for (i <- docs.indices) {
+        for (j <- docs.indices) {
+          if (i != j) {
+            list +=
+              ((docs(i).getObjectId("movie_id"), docs(j).getObjectId("movie_id"),
+                1.0 / math.log(1 + docs.length)))
+          }
         }
       }
       list
@@ -54,27 +57,22 @@ object ItemSimilarityMatrixUpdater {
     weights = weights.map {
       case (aMovieID, bMovieID, weight) => (aMovieID, bMovieID, weight/movieID2MaxWeight(aMovieID))
     }
-    weights = weights.union(weights.map {
-      case (aMovieID, bMovieID, weight) => (bMovieID, aMovieID, weight)
-    })
 
-    val a = weights.groupBy(record => record._1)
-    val b = a.map {
+    // 对每一个电影，存储weight k临近的电影列表
+    val k = 8
+    val kMaxSimMat = weights.groupBy(record => record._1).map {
       case (aMovieID, iter) =>
-        (aMovieID, iter.map(x => (x._2, x._3)).toArray.sortBy(x => x._2).reverse.take(8))
+        (aMovieID, iter.map(x => (x._2, x._3)).toArray.sortBy(x => x._2).reverse.take(k))
     }
 
     def getObjectIDString(id:ObjectId): String = {
       val idStr = id.toString
-      List.fill(24 - idStr.length)('0').mkString + idStr
+      "\"" + List.fill(24 - idStr.length)('0').mkString + idStr + "\""
     }
     def getArray(relateIDs:Array[(ObjectId, Double)]): String = {
       val sb = new StringBuilder
       for (i <- relateIDs.indices) {
-        sb.append("[{\"$oid\": \"" + getObjectIDString(relateIDs(i)._1) + "\"}")
-        sb.append(",")
-        sb.append(relateIDs(i)._2)
-        sb.append("]")
+        sb.append(s"[{$$oid:${getObjectIDString(relateIDs(i)._1)}},${relateIDs(i)._2}]")
         if (i < relateIDs.length - 1) {
           sb.append(",")
         }
@@ -82,10 +80,10 @@ object ItemSimilarityMatrixUpdater {
       sb.toString()
     }
     def parse(aMovieID:ObjectId, relateIDs:Array[(ObjectId, Double)]): Document = {
-      Document.parse("{\"from\": {\"$oid\": \"" + aMovieID + "\"}, \"to\": [" + getArray(relateIDs) + "]}")
+      Document.parse(s"{from:{$$oid:${getObjectIDString(aMovieID)}}, to:[${getArray(relateIDs)}]}")
     }
 
-    b.map {
+    kMaxSimMat.map {
       case (movieID, relates) => parse(movieID, relates)
     }
   }

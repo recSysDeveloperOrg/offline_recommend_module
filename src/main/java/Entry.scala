@@ -1,4 +1,5 @@
 import com.mongodb.spark.MongoSpark
+import config.MongoConfig
 import core.ItemSimilarityMatrixUpdater
 import org.apache.spark.{SparkConf, SparkContext}
 
@@ -10,13 +11,14 @@ import org.apache.spark.{SparkConf, SparkContext}
  * */
 object Entry {
   def main(args: Array[String]): Unit = {
-    val sparkConf = new SparkConf().setMaster("spark://master:7077").setAppName("recommend")
-      .set("spark.mongodb.input.uri", "mongodb://admin:123456@172.17.168.4:27017")
-      .set("spark.mongodb.input.database", "movie")
-      .set("spark.mongodb.input.collection", "rating")
-      .set("spark.mongodb.output.uri", "mongodb://admin:123456@172.17.168.4:27017")
-      .set("spark.mongodb.output.database", "movie")
-      .set("spark.mongodb.output.collection", "movie_sim_mat")
+    val cfg:MongoConfig = MongoConfig(MongoConfig.prodLocal)
+    val sparkConf = new SparkConf().setMaster(cfg.master).setAppName("recommend")
+      .set("spark.mongodb.input.uri", cfg.inputURI)
+      .set("spark.mongodb.input.database", cfg.inputDatabase)
+      .set("spark.mongodb.input.collection", cfg.inputCollection)
+      .set("spark.mongodb.output.uri", cfg.outputURI)
+      .set("spark.mongodb.output.database", cfg.outputDatabase)
+      .set("spark.mongodb.output.collection", cfg.outputCollection)
     val sc = new SparkContext(sparkConf)
     val rdd = MongoSpark.load(sc)
     val mongoRDD = ItemSimilarityMatrixUpdater.doUpdate(rdd)
